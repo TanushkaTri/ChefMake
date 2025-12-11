@@ -1,0 +1,295 @@
+@startuml ChefMake Class Diagram
+
+!theme plain
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+
+' ==========================================
+' DATABASE ENTITIES (Models)
+' ==========================================
+
+class User {
+  -id: Integer
+  -name: String
+  -email: String
+  -password: String
+  -level: Integer
+  -xp: Integer
+  -streak: Integer
+  -last_login: Timestamp
+  -total_meals_cooked: Integer
+  -north_indian_meals_cooked: Integer
+  -south_indian_meals_cooked: Integer
+  -west_indian_meals_cooked: Integer
+  -east_indian_meals_cooked: Integer
+  -created_at: Timestamp
+  -updated_at: Timestamp
+  --
+  +findUserByEmail(email): User
+  +createUser(data): User
+  +findUserById(id): User
+  +updateUserName(id, name): User
+  +updateUserPassword(id, password): void
+  +updateLoginMeta(userId): void
+  +incrementMealCookedCount(userId, region): void
+}
+
+class Recipe {
+  -id: Integer
+  -name: String
+  -ingredients: String
+  -diet: String
+  -prep_time: Integer
+  -cook_time: Integer
+  -total_time: Integer
+  -difficulty: String
+  -flavor_profile: String
+  -course: String
+  -state: String
+  -region: String
+  -image_url: String
+  -instruction: String
+  -created_at: Timestamp
+  --
+  +getAllRecipesWithStatus(userId): Recipe[]
+  +getRecipeByIdWithStatus(id, userId): Recipe
+  +searchRecipesByNameWithStatus(query, userId): Recipe[]
+  +filterRecipesWithStatus(filters, userId): Recipe[]
+  +getRandomRecipes(count): Recipe[]
+}
+
+class Favorite {
+  -user_id: Integer
+  -recipe_id: Integer
+  -added_at: Timestamp
+  --
+  +getUserFavorites(userId): Recipe[]
+  +addFavorite(userId, recipeId): void
+  +removeFavorite(userId, recipeId): void
+}
+
+class WeeklyPlan {
+  -id: Integer
+  -user_id: Integer
+  -day_of_week: String
+  -meal_slot: String
+  -recipe_id: Integer
+  -planned_at: Timestamp
+  -updated_at: Timestamp
+  --
+  +getWeeklyPlan(userId): WeeklyPlan[]
+  +saveMealPlanEntry(userId, day, slot, recipeId): WeeklyPlan
+  +deleteMealPlanEntry(userId, day, slot): Integer
+}
+
+class ShoppingList {
+  -id: Integer
+  -user_id: Integer
+  -items: JSONB
+  -generated_at: Timestamp
+  --
+  +saveShoppingList(userId, items): ShoppingList
+  +getLatestShoppingList(userId): ShoppingList
+  +getAllShoppingLists(userId): ShoppingList[]
+}
+
+class CookedMeal {
+  -id: Integer
+  -user_id: Integer
+  -recipe_id: Integer
+  -difficulty: String
+  -actual_cook_time_seconds: Integer
+  -cooked_at: Timestamp
+  --
+  +recordCookedMeal(userId, recipeId, difficulty, time): CookedMeal
+  +getCookedMealStats(userId): Stats
+}
+
+class ChatLog {
+  -id: Integer
+  -user_id: Integer
+  -message: String
+  -role: String
+  -sent_at: Timestamp
+  --
+  +getChatHistory(userId): ChatLog[]
+  +saveChatMessage(userId, message, role): void
+}
+
+' ==========================================
+' CONTROLLERS
+' ==========================================
+
+class AuthController {
+  +register(req, res): void
+  +login(req, res): void
+  +logout(req, res): void
+  +getMe(req, res): void
+  +updateProfile(req, res): void
+  +changePassword(req, res): void
+}
+
+class RecipesController {
+  +getAllRecipes(req, res): void
+  +getRecipeById(req, res): void
+  +searchRecipes(req, res): void
+  +filterRecipes(req, res): void
+}
+
+class FavoritesController {
+  +getFavorites(req, res): void
+  +addToFavorites(req, res): void
+  +removeFromFavorites(req, res): void
+}
+
+class MealPlannerController {
+  +getWeeklyPlan(req, res): void
+  +saveMealToPlan(req, res): void
+  +deleteMealFromPlan(req, res): void
+  +randomizeMealPlan(req, res): void
+}
+
+class GamificationController {
+  +recordCookedMeal(req, res): void
+  +getCookedMealStats(req, res): void
+}
+
+class AIController {
+  +customizeRecipe(req, res): void
+  +handleChat(req, res): void
+  +generateShoppingList(req, res): void
+  +getShoppingList(req, res): void
+}
+
+' ==========================================
+' MIDDLEWARES & UTILITIES
+' ==========================================
+
+class AuthMiddleware {
+  +authMiddleware(req, res, next): void
+}
+
+class JWTUtils {
+  +generateToken(user): String
+  +verifyToken(token): Object
+}
+
+class RedisClient {
+  +get(key): String
+  +set(key, value, expire): void
+}
+
+' ==========================================
+' FRONTEND SERVICES
+' ==========================================
+
+class RecipeService {
+  +getAllRecipes(token): Promise<Recipe[]>
+  +getRecipeById(id, token): Promise<Recipe>
+  +searchRecipes(query, token): Promise<Recipe[]>
+  +filterRecipes(filters, token): Promise<Recipe[]>
+}
+
+class FavoritesService {
+  +getFavorites(token): Promise<Recipe[]>
+  +addFavorite(recipeId, token): Promise<void>
+  +removeFavorite(recipeId, token): Promise<void>
+}
+
+class MealPlannerService {
+  +getWeeklyPlan(token): Promise<WeeklyPlan[]>
+  +saveMeal(day, slot, recipeId, token): Promise<void>
+  +deleteMeal(day, slot, token): Promise<void>
+  +randomizeMealPlan(token): Promise<void>
+}
+
+class ChatService {
+  +sendMessage(message, token): Promise<String>
+  +getChatHistory(token): Promise<ChatLog[]>
+}
+
+class ShoppingListService {
+  +generateShoppingList(dishNames, token): Promise<ShoppingList>
+  +getShoppingList(token): Promise<ShoppingList>
+}
+
+class GamificationService {
+  +recordCookedMeal(data, token): Promise<void>
+  +getStats(token): Promise<Stats>
+}
+
+' ==========================================
+' FRONTEND CONTEXT
+' ==========================================
+
+class AuthContext {
+  -user: User | null
+  -isLoading: Boolean
+  +login(email, password): Promise<Result>
+  +register(name, email, password): Promise<Result>
+  +logout(): void
+  +forgotPassword(email): Promise<Result>
+  +resetPassword(token, password): Promise<Result>
+  +updateProfile(updates): Promise<Result>
+}
+
+' ==========================================
+' RELATIONSHIPS
+' ==========================================
+
+User ||--o{ Favorite : has
+User ||--o{ WeeklyPlan : plans
+User ||--o{ ShoppingList : generates
+User ||--o{ CookedMeal : records
+User ||--o{ ChatLog : sends
+
+Recipe ||--o{ Favorite : favorited_by
+Recipe ||--o{ WeeklyPlan : included_in
+Recipe ||--o{ CookedMeal : cooked_as
+
+AuthController ..> User : uses
+AuthController ..> JWTUtils : uses
+
+RecipesController ..> Recipe : uses
+FavoritesController ..> Favorite : uses
+FavoritesController ..> Recipe : uses
+
+MealPlannerController ..> WeeklyPlan : uses
+MealPlannerController ..> Recipe : uses
+MealPlannerController ..> ShoppingList : uses
+
+GamificationController ..> CookedMeal : uses
+GamificationController ..> User : updates
+
+AIController ..> ShoppingList : uses
+AIController ..> RedisClient : uses
+AIController ..> Recipe : uses
+
+AuthMiddleware ..> JWTUtils : uses
+
+RecipeService ..> AuthContext : requires
+FavoritesService ..> AuthContext : requires
+MealPlannerService ..> AuthContext : requires
+ChatService ..> AuthContext : requires
+ShoppingListService ..> AuthContext : requires
+GamificationService ..> AuthContext : requires
+
+AuthContext ..> User : manages
+
+note right of User
+  Основная сущность пользователя
+  с метаданными для геймификации
+end note
+
+note right of Recipe
+  Хранит информацию о рецептах
+  с поддержкой фильтрации
+end note
+
+note right of AIController
+  Интегрируется с внешним
+  Hugging Face AI сервисом
+end note
+
+@enduml
+
