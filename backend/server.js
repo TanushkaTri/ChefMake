@@ -33,6 +33,18 @@ const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15-minute window
     max: 100, // max requests per window
     message: "Too many requests from this IP, please try again later.",
+    standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers (includes Retry-After)
+    legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+    handler: (req, res) => {
+        // Calculate seconds until retry (remaining time in the window)
+        const resetTime = new Date(Date.now() + (15 * 60 * 1000));
+        const retryAfter = Math.ceil((resetTime.getTime() - Date.now()) / 1000);
+        
+        res.setHeader('Retry-After', retryAfter);
+        res.status(429).json({
+            message: "Too many requests from this IP, please try again later.",
+        });
+    },
 });
 app.use(limiter);
 

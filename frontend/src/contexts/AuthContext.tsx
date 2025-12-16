@@ -180,6 +180,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         body: JSON.stringify({ email, password }),
       });
 
+      // Специальная обработка для 429 (Too Many Requests)
+      if (response.status === 429) {
+        const retryAfter = response.headers.get('retry-after');
+        let message = 'Слишком много запросов. Пожалуйста, подождите несколько минут и попробуйте снова.';
+        if (retryAfter) {
+          const seconds = parseInt(retryAfter, 10);
+          if (seconds < 60) {
+            message = `Слишком много запросов. Попробуйте снова через ${seconds} секунд.`;
+          } else {
+            const minutes = Math.ceil(seconds / 60);
+            message = `Слишком много запросов. Попробуйте снова через ${minutes} ${minutes === 1 ? 'минуту' : 'минут'}.`;
+          }
+        }
+        return { success: false, message };
+      }
+
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
         const text = await response.text();
@@ -189,7 +205,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           contentType,
           body: text.substring(0, 200),
         });
-        return { success: false, message: `Server error: ${response.status} ${response.statusText}` };
+        
+        // Специальные сообщения для разных статусов
+        if (response.status === 429) {
+          const retryAfter = response.headers.get('retry-after');
+          let message = 'Слишком много запросов. Пожалуйста, подождите несколько минут и попробуйте снова.';
+          if (retryAfter) {
+            const seconds = parseInt(retryAfter, 10);
+            if (seconds < 60) {
+              message = `Слишком много запросов. Попробуйте снова через ${seconds} секунд.`;
+            } else {
+              const minutes = Math.ceil(seconds / 60);
+              message = `Слишком много запросов. Попробуйте снова через ${minutes} ${minutes === 1 ? 'минуту' : 'минут'}.`;
+            }
+          }
+          return { success: false, message };
+        }
+        return { success: false, message: `Ошибка сервера: ${response.status} ${response.statusText}` };
       }
 
       const data = await response.json();
@@ -222,6 +254,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         body: JSON.stringify({ name, email, password }),
       });
 
+      // Специальная обработка для 429 (Too Many Requests)
+      if (response.status === 429) {
+        const retryAfter = response.headers.get('retry-after');
+        let message = 'Слишком много запросов. Пожалуйста, подождите несколько минут и попробуйте снова.';
+        if (retryAfter) {
+          const seconds = parseInt(retryAfter, 10);
+          if (seconds < 60) {
+            message = `Слишком много запросов. Попробуйте снова через ${seconds} секунд.`;
+          } else {
+            const minutes = Math.ceil(seconds / 60);
+            message = `Слишком много запросов. Попробуйте снова через ${minutes} ${minutes === 1 ? 'минуту' : 'минут'}.`;
+          }
+        }
+        return { success: false, message };
+      }
+
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
         const text = await response.text();
@@ -231,7 +279,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           contentType,
           body: text.substring(0, 200),
         });
-        return { success: false, message: `Server error: ${response.status} ${response.statusText}` };
+        
+        // Специальные сообщения для разных статусов
+        if (response.status === 429) {
+          const retryAfter = response.headers.get('retry-after');
+          let message = 'Слишком много запросов. Пожалуйста, подождите несколько минут и попробуйте снова.';
+          if (retryAfter) {
+            const seconds = parseInt(retryAfter, 10);
+            if (seconds < 60) {
+              message = `Слишком много запросов. Попробуйте снова через ${seconds} секунд.`;
+            } else {
+              const minutes = Math.ceil(seconds / 60);
+              message = `Слишком много запросов. Попробуйте снова через ${minutes} ${minutes === 1 ? 'минуту' : 'минут'}.`;
+            }
+          }
+          return { success: false, message };
+        }
+        return { success: false, message: `Ошибка сервера: ${response.status} ${response.statusText}` };
       }
 
       const data = await response.json();
