@@ -60,17 +60,43 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   // Exchange Supabase access token for local JWT
   const exchangeSupabaseToken = async (accessToken: string) => {
+    if (!API_BASE_URL) {
+      console.error("API_BASE_URL is not configured");
+      return false;
+    }
+
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/supabase-login`, {
+      const url = `${API_BASE_URL}/auth/supabase-login`;
+      console.log("Attempting Supabase token exchange to:", url);
+      
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
         },
       });
+
+      // Проверяем Content-Type перед парсингом JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error("Supabase token exchange failed: Server returned non-JSON response", {
+          status: response.status,
+          statusText: response.statusText,
+          contentType,
+          url,
+          body: text.substring(0, 200), // первые 200 символов для отладки
+        });
+        return false;
+      }
+
       const data = await response.json();
       if (response.ok) {
         saveUserToLocalStorage(data.user, data.token);
         return true;
+      } else {
+        console.error("Supabase token exchange failed:", data);
       }
     } catch (err) {
       console.error("Supabase token exchange failed", err);
