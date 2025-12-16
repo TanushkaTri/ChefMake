@@ -14,6 +14,9 @@ const parseHashParams = (hash: string) => {
     access_token: params.get("access_token") || undefined,
     refresh_token: params.get("refresh_token") || undefined,
     type: params.get("type") || undefined,
+    error: params.get("error") || undefined,
+    error_code: params.get("error_code") || undefined,
+    error_description: params.get("error_description") || undefined,
   };
 };
 
@@ -25,17 +28,35 @@ const ResetPassword = () => {
 
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [refreshToken, setRefreshToken] = useState<string | null>(null);
-  const [stage, setStage] = useState<"init" | "ready" | "success">("init");
+  const [stage, setStage] = useState<"init" | "ready" | "success" | "error">("init");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const hashParams = useMemo(() => parseHashParams(location.hash), [location.hash]);
 
   useEffect(() => {
     const bootstrap = async () => {
+      // Проверяем наличие ошибки в URL
+      if (hashParams.error) {
+        const errorDesc = hashParams.error_description 
+          ? decodeURIComponent(hashParams.error_description.replace(/\+/g, " "))
+          : "Ссылка недействительна или просрочена";
+        setErrorMessage(errorDesc);
+        setStage("error");
+        setLoading(false);
+        return;
+      }
+
       if (hashParams.type !== "recovery" || !hashParams.access_token || !hashParams.refresh_token) {
-        setStage("ready"); // allow manual reset if already logged in
+        // Если пользователь уже авторизован, разрешаем ручной сброс
+        if (user?.token) {
+          setStage("ready");
+        } else {
+          setErrorMessage("Ссылка для сброса пароля не найдена. Запросите новую ссылку.");
+          setStage("error");
+        }
         return;
       }
       try {
@@ -48,27 +69,21 @@ const ResetPassword = () => {
         setRefreshToken(hashParams.refresh_token);
         const ok = await loginWithSupabaseToken(hashParams.access_token);
         if (!ok) {
-          toast({
-            title: "Не удалось подтвердить вход",
-            description: "Попробуйте повторить сброс пароля ещё раз.",
-            variant: "destructive",
-          });
+          setErrorMessage("Не удалось подтвердить ссылку. Запросите новую ссылку для сброса пароля.");
+          setStage("error");
         } else {
           setStage("ready");
         }
       } catch (err) {
         console.error("Reset bootstrap failed", err);
-        toast({
-          title: "Ошибка",
-          description: "Не удалось подтвердить ссылку. Повторите запрос сброса.",
-          variant: "destructive",
-        });
+        setErrorMessage("Не удалось подтвердить ссылку. Запросите новую ссылку для сброса пароля.");
+        setStage("error");
       } finally {
         setLoading(false);
       }
     };
     bootstrap();
-  }, [hashParams, loginWithSupabaseToken, toast]);
+  }, [hashParams, loginWithSupabaseToken, user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -126,16 +141,24 @@ const ResetPassword = () => {
           <div className="flex justify-center mb-2">
             {stage === "success" ? (
               <CheckCircle className="h-12 w-12 text-green-500" />
+            ) : stage === "error" ? (
+              <AlertCircle className="h-12 w-12 text-destructive" />
             ) : (
               <Lock className="h-12 w-12 text-orange-500" />
             )}
           </div>
           <CardTitle className="text-2xl">
-            {stage === "success" ? "Пароль обновлён" : "Сброс пароля"}
+            {stage === "success" 
+              ? "Пароль обновлён" 
+              : stage === "error"
+              ? "Ошибка восстановления"
+              : "Сброс пароля"}
           </CardTitle>
           <CardDescription>
             {stage === "success"
               ? "Теперь можно войти с новым паролем."
+              : stage === "error"
+              ? "Не удалось восстановить доступ. Запросите новую ссылку."
               : "Введите новый пароль для вашего аккаунта."}
           </CardDescription>
         </CardHeader>
@@ -178,7 +201,35 @@ const ResetPassword = () => {
             </div>
           )}
 
-          {stage !== "success" && !accessToken && (
+          {stage === "error" && (
+            <div className="space-y-4">
+              <div className="flex items-start gap-3 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+                <AlertCircle className="h-5 w-5 text-destructive mt-0.5 flex-shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <p className="text-sm font-medium text-destructive">Ссылка недействительна</p>
+                  <p className="text-xs text-muted-foreground">
+                    {errorMessage || "Ссылка для сброса пароля просрочена или уже была использована."}
+                  </p>
+                </div>
+              </div>
+              <Button
+                onClick={() => navigate("/forgot-password")}
+                className="w-full"
+                variant="default"
+              >
+                Запросить новую ссылку
+              </Button>
+              <Button
+                onClick={() => navigate("/login")}
+                className="w-full"
+                variant="outline"
+              >
+                Вернуться к входу
+              </Button>
+            </div>
+          )}
+
+          {stage !== "success" && stage !== "error" && !accessToken && (
             <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
               <AlertCircle className="h-4 w-4 text-amber-500" />
               Если ссылка устарела, запросите сброс пароля ещё раз.
