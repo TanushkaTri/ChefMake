@@ -105,7 +105,11 @@ const ResetPassword = () => {
     }
     try {
       setLoading(true);
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/auth/change-password`, {
+      const apiUrl = import.meta.env.VITE_API_BASE_URL;
+      if (!apiUrl) {
+        throw new Error("API_BASE_URL is not configured");
+      }
+      const response = await fetch(`${apiUrl}/api/auth/change-password`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -113,6 +117,19 @@ const ResetPassword = () => {
         },
         body: JSON.stringify({ newPassword: password }),
       });
+      
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error("Change password failed: Server returned non-JSON response", {
+          status: response.status,
+          statusText: response.statusText,
+          contentType,
+          body: text.substring(0, 200),
+        });
+        throw new Error(`Server error: ${response.status} ${response.statusText}`);
+      }
+      
       const data = await response.json();
       if (!response.ok) {
         throw new Error(data.message || "Не удалось сменить пароль");

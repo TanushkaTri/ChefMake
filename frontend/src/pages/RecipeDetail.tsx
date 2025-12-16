@@ -70,32 +70,48 @@ const RecipeDetail = () => {
         });
 
         const contentType = response.headers.get('content-type');
+        
+        // Проверяем Content-Type перед парсингом
         if (!contentType || !contentType.includes('application/json')) {
           const text = await response.text();
           console.error("Recipe fetch failed: Server returned non-JSON response", {
             status: response.status,
             statusText: response.statusText,
             contentType,
+            url: `${API_BASE_URL}/api/recipes/${id}`,
             body: text.substring(0, 200),
           });
           setError(`Ошибка сервера: ${response.status} ${response.statusText}`);
           toast({
             title: "Ошибка сервера",
-            description: `Сервер вернул не-JSON ответ: ${response.status}`,
+            description: `Сервер вернул не-JSON ответ: ${response.status}. Проверьте консоль для деталей.`,
             variant: "destructive",
           });
           return;
         }
 
-        const data = await response.json();
+        // Парсим JSON только если Content-Type правильный
+        let data;
+        try {
+          data = await response.json();
+        } catch (parseError) {
+          console.error("Failed to parse JSON response", parseError);
+          setError("Ошибка при обработке ответа сервера");
+          toast({
+            title: "Ошибка парсинга",
+            description: "Сервер вернул некорректный JSON",
+            variant: "destructive",
+          });
+          return;
+        }
 
         if (response.ok) {
           setRecipe(data.recipe);
         } else {
-          setError(data.message || "Не удалось загрузить рецепт.");
+          setError(data.message || `Не удалось загрузить рецепт (${response.status})`);
           toast({
             title: "Не удалось загрузить рецепт",
-            description: data.message || "Не получилось получить подробности.",
+            description: data.message || `Ошибка ${response.status}: ${response.statusText}`,
             variant: "destructive",
           });
         }

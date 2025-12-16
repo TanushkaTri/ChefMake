@@ -15,6 +15,17 @@ export const recipeService = {
                 'Authorization': `Bearer ${token}`,
             },
         });
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            const text = await response.text();
+            console.error("getAllRecipes failed: Server returned non-JSON response", {
+                status: response.status,
+                statusText: response.statusText,
+                contentType,
+                body: text.substring(0, 200),
+            });
+            throw new Error(`Server error: ${response.status} ${response.statusText}`);
+        }
         if (!response.ok) {
             const errorData = await response.json();
             throw new Error(errorData.message || 'Failed to fetch all recipes');
@@ -29,6 +40,17 @@ export const recipeService = {
                 'Authorization': `Bearer ${token}`,
             },
         });
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            const text = await response.text();
+            console.error("searchRecipes failed: Server returned non-JSON response", {
+                status: response.status,
+                statusText: response.statusText,
+                contentType,
+                body: text.substring(0, 200),
+            });
+            throw new Error(`Server error: ${response.status} ${response.statusText}`);
+        }
         if (!response.ok) {
             const errorData = await response.json();
             throw new Error(errorData.message || `Failed to search recipes for "${query}"`);
@@ -51,6 +73,17 @@ export const recipeService = {
                 'Authorization': `Bearer ${token}`,
             },
         });
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            const text = await response.text();
+            console.error("filterRecipes failed: Server returned non-JSON response", {
+                status: response.status,
+                statusText: response.statusText,
+                contentType,
+                body: text.substring(0, 200),
+            });
+            throw new Error(`Server error: ${response.status} ${response.statusText}`);
+        }
         if (!response.ok) {
             const errorData = await response.json();
             throw new Error(errorData.message || 'Failed to filter recipes');
@@ -65,9 +98,26 @@ export const recipeService = {
                 'Authorization': `Bearer ${token}`,
             },
         });
+        const contentType = response.headers.get('content-type');
+        
+        // Если 404, возвращаем null без проверки Content-Type
         if (response.status === 404) {
             return null;
         }
+        
+        // Проверяем Content-Type перед парсингом
+        if (!contentType || !contentType.includes('application/json')) {
+            const text = await response.text();
+            console.error("getRecipeById failed: Server returned non-JSON response", {
+                status: response.status,
+                statusText: response.statusText,
+                contentType,
+                url: `${API_BASE_URL}/api/recipes/${id}`,
+                body: text.substring(0, 200),
+            });
+            throw new Error(`Server error: ${response.status} ${response.statusText}`);
+        }
+        
         if (!response.ok) {
             const errorData = await response.json();
             throw new Error(errorData.message || `Failed to fetch recipe with ID ${id}`);
