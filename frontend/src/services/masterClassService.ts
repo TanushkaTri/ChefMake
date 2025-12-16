@@ -78,7 +78,7 @@ export const masterClassService = {
   async list(token: string, filter?: string): Promise<MasterClass[]> {
     const query = filter ? `?filter=${filter}` : "";
     const data = await request<{ items: MasterClass[] }>(
-      `/master-classes${query}`,
+      `/api/master-classes${query}`,
       { method: "GET" },
       token
     );
@@ -87,7 +87,7 @@ export const masterClassService = {
 
   async create(payload: CreateMasterClassPayload, token: string) {
     return request<{ masterClass: MasterClass } & Partial<StreamJoinResponse>>(
-      "/master-classes",
+      "/api/master-classes",
       {
         method: "POST",
         body: JSON.stringify(payload),
@@ -98,7 +98,7 @@ export const masterClassService = {
 
   async join(masterClassId: number, token: string): Promise<StreamJoinResponse> {
     return request<StreamJoinResponse>(
-      `/master-classes/${masterClassId}/token`,
+      `/api/master-classes/${masterClassId}/token`,
       { method: "POST" },
       token
     );
@@ -106,7 +106,7 @@ export const masterClassService = {
 
   async remove(masterClassId: number, token: string) {
     return request<{ message: string }>(
-      `/master-classes/${masterClassId}`,
+      `/api/master-classes/${masterClassId}`,
       { method: "DELETE" },
       token
     );
@@ -114,7 +114,7 @@ export const masterClassService = {
 
   async getMessages(masterClassId: number, token: string) {
     const data = await request<{ items: MasterClassMessage[] }>(
-      `/master-classes/${masterClassId}/messages`,
+      `/api/master-classes/${masterClassId}/messages`,
       { method: "GET" },
       token
     );
@@ -123,7 +123,7 @@ export const masterClassService = {
 
   async sendMessage(masterClassId: number, message: string, token: string) {
     return request<{ message: MasterClassMessage }>(
-      `/master-classes/${masterClassId}/messages`,
+      `/api/master-classes/${masterClassId}/messages`,
       {
         method: "POST",
         body: JSON.stringify({ message }),

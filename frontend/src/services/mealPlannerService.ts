@@ -23,8 +23,8 @@ export const mealPlannerService = {
     // Fetch the entire weekly meal plan
     async getWeeklyPlan(token: string, weekStartDate?: string): Promise<WeeklyPlanEntry[]> {
         const url = weekStartDate 
-            ? `${API_BASE_URL}/planner/weekly-plan?week_start=${weekStartDate}`
-            : `${API_BASE_URL}/planner/weekly-plan`;
+            ? `${API_BASE_URL}/api/planner/weekly-plan?week_start=${weekStartDate}`
+            : `${API_BASE_URL}/api/planner/weekly-plan`;
         
         const response = await fetch(url, {
             method: 'GET',
@@ -50,7 +50,7 @@ export const mealPlannerService = {
         token: string,
         weekStartDate?: string
     ): Promise<SaveMealPlanResponse> {
-        const response = await fetch(`${API_BASE_URL}/planner/weekly-plan/meal`, {
+        const response = await fetch(`${API_BASE_URL}/api/planner/weekly-plan/meal`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -79,7 +79,7 @@ export const mealPlannerService = {
         token: string,
         weekStartDate?: string
     ): Promise<SaveMealPlanResponse> {
-        const response = await fetch(`${API_BASE_URL}/planner/weekly-plan/meal`, {
+        const response = await fetch(`${API_BASE_URL}/api/planner/weekly-plan/meal`, {
             method: 'DELETE',
             headers: {
                 'Content-Type': 'application/json',
@@ -102,7 +102,7 @@ export const mealPlannerService = {
 
     // Generate a randomized weekly meal plan
     async randomizeMealPlan(token: string, weekStartDate?: string): Promise<SaveMealPlanResponse> {
-        const response = await fetch(`${API_BASE_URL}/planner/random-meals`, {
+        const response = await fetch(`${API_BASE_URL}/api/planner/random-meals`, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${token}`,

@@ -105,7 +105,7 @@ const ResetPassword = () => {
     }
     try {
       setLoading(true);
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/auth/change-password`, {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/auth/change-password`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",

@@ -30,7 +30,7 @@ export const shoppingListService = {
     dishNames: string[],
     token: string
   ): Promise<ShoppingListResponse> {
-    const response = await fetch(`${API_BASE_URL}/ai/generate-shopping-list`, {
+    const response = await fetch(`${API_BASE_URL}/api/ai/generate-shopping-list`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -59,7 +59,7 @@ export const shoppingListService = {
   async getLatestList(
     token: string
   ): Promise<LatestShoppingListResponse | null> {
-    const response = await fetch(`${API_BASE_URL}/ai/shopping-list`, {
+    const response = await fetch(`${API_BASE_URL}/api/ai/shopping-list`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,

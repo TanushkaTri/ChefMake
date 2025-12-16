@@ -27,7 +27,7 @@ export const gamificationService = {
         actualCookTimeSeconds: number,
         token: string
     ): Promise<RecordCookedMealResponse> {
-        const response = await fetch(`${API_BASE_URL}/gamification/cooked-meal`, {
+        const response = await fetch(`${API_BASE_URL}/api/gamification/cooked-meal`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -50,7 +50,7 @@ export const gamificationService = {
      * @returns {Promise<CookedMealStats>} Cooked meal counts by difficulty.
      */
     async getCookedMealStats(token: string): Promise<CookedMealStats> {
-        const response = await fetch(`${API_BASE_URL}/gamification/stats`, {
+        const response = await fetch(`${API_BASE_URL}/api/gamification/stats`, {
             method: 'GET',
             headers: {
                 'Authorization': `Bearer ${token}`,

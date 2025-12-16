@@ -10,7 +10,7 @@ interface RecipesApiResponse {
 
 export const recipeService = {
     getAllRecipes: async (token: string): Promise<Recipe[]> => {
-        const response = await fetch(`${API_BASE_URL}/recipes`, {
+        const response = await fetch(`${API_BASE_URL}/api/recipes`, {
             headers: {
                 'Authorization': `Bearer ${token}`,
             },
@@ -24,7 +24,7 @@ export const recipeService = {
     },
 
     searchRecipes: async (query: string, token: string): Promise<Recipe[]> => {
-        const response = await fetch(`${API_BASE_URL}/recipes/search?q=${encodeURIComponent(query)}`, {
+        const response = await fetch(`${API_BASE_URL}/api/recipes/search?q=${encodeURIComponent(query)}`, {
             headers: {
                 'Authorization': `Bearer ${token}`,
             },
@@ -46,7 +46,7 @@ export const recipeService = {
         });
 
         const queryString = queryParams.toString();
-        const response = await fetch(`${API_BASE_URL}/recipes/filter?${queryString}`, {
+        const response = await fetch(`${API_BASE_URL}/api/recipes/filter?${queryString}`, {
             headers: {
                 'Authorization': `Bearer ${token}`,
             },
@@ -60,7 +60,7 @@ export const recipeService = {
     },
 
     getRecipeById: async (id: string, token: string): Promise<Recipe | null> => {
-        const response = await fetch(`${API_BASE_URL}/recipes/${id}`, {
+        const response = await fetch(`${API_BASE_URL}/api/recipes/${id}`, {
             headers: {
                 'Authorization': `Bearer ${token}`,
             },

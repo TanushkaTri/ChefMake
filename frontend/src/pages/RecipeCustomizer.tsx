@@ -271,7 +271,7 @@ const RecipeCustomizer = () => {
     setCustomizedRecipe("");
 
     try {
-      const response = await fetch(`${API_BASE_URL}/ai/customize-recipe`, {
+      const response = await fetch(`${API_BASE_URL}/api/ai/customize-recipe`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

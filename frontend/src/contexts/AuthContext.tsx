@@ -66,7 +66,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
 
     try {
-      const url = `${API_BASE_URL}/auth/supabase-login`;
+      const url = `${API_BASE_URL}/api/auth/supabase-login`;
       console.log("Attempting Supabase token exchange to:", url);
       
       const response = await fetch(url, {
@@ -115,22 +115,31 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (storedUserString) {
         try {
           const storedUser: User = JSON.parse(storedUserString);
-          if (storedUser.token) {
-            const response = await fetch(`${API_BASE_URL}/auth/me`, {
+          if (storedUser.token && API_BASE_URL) {
+            const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
               method: 'GET',
               headers: {
                 'Authorization': `Bearer ${storedUser.token}`,
               },
             });
 
-            if (response.ok) {
-              const data = await response.json();
-              saveUserToLocalStorage(data.user, storedUser.token);
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+              if (response.ok) {
+                const data = await response.json();
+                saveUserToLocalStorage(data.user, storedUser.token);
+              } else {
+                console.warn('Token is invalid or expired.');
+                removeUserFromLocalStorage();
+              }
             } else {
-              console.warn('Token is invalid or expired.');
+              console.warn('Server returned non-JSON response for /auth/me');
               removeUserFromLocalStorage();
             }
           } else {
+            if (!API_BASE_URL) {
+              console.error('API_BASE_URL is not configured');
+            }
             removeUserFromLocalStorage();
           }
         } catch (error) {
@@ -161,11 +170,27 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const login = async (email: string, password: string): Promise<{ success: boolean; message?: string }> => {
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/login`, {
+      if (!API_BASE_URL) {
+        return { success: false, message: 'API_BASE_URL is not configured' };
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
+
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error("Login failed: Server returned non-JSON response", {
+          status: response.status,
+          statusText: response.statusText,
+          contentType,
+          body: text.substring(0, 200),
+        });
+        return { success: false, message: `Server error: ${response.status} ${response.statusText}` };
+      }
 
       const data = await response.json();
 
@@ -187,11 +212,27 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const register = async (name: string, email: string, password: string): Promise<{ success: boolean; message?: string }> => {
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/register`, {
+      if (!API_BASE_URL) {
+        return { success: false, message: 'API_BASE_URL is not configured' };
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, email, password }),
       });
+
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error("Registration failed: Server returned non-JSON response", {
+          status: response.status,
+          statusText: response.statusText,
+          contentType,
+          body: text.substring(0, 200),
+        });
+        return { success: false, message: `Server error: ${response.status} ${response.statusText}` };
+      }
 
       const data = await response.json();
       console.log(data);
@@ -230,7 +271,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   // Send forgot password request
   const forgotPassword = async (email: string): Promise<{ success: boolean; message?: string }> => {
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
+      const response = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
@@ -252,7 +293,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   // Reset password using token
   const resetPassword = async (token: string, password: string): Promise<{ success: boolean; message?: string }> => {
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
+      const response = await fetch(`${API_BASE_URL}/api/auth/reset-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, password }),
@@ -279,7 +320,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/update`, {
+      const response = await fetch(`${API_BASE_URL}/api/auth/update`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

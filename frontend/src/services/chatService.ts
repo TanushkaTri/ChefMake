@@ -12,7 +12,7 @@ export const chatService = {
    * @returns AI reply
    */
   async sendMessage(message: string, token: string): Promise<ChatResponseFromBackend> {
-    const response = await fetch(`${API_BASE_URL}/ai/chat`, {
+    const response = await fetch(`${API_BASE_URL}/api/ai/chat`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

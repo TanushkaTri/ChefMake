@@ -25,7 +25,7 @@ export const favoritesService = {
    */
   getFavorites: async (token: string): Promise<Recipe[]> => {
     if (!token) throw new Error('Authentication token is required to fetch favorites.');
-    const response = await fetch(`${API_BASE_URL}/favorites/`, {
+    const response = await fetch(`${API_BASE_URL}/api/favorites/`, {
       headers: {
         'Authorization': `Bearer ${token}`,
       },
@@ -47,7 +47,7 @@ export const favoritesService = {
    */
   addToFavorites: async (recipeId: number, token: string): Promise<void> => {
     if (!token) throw new Error('Authentication token is required to add favorites.');
-    const response = await fetch(`${API_BASE_URL}/favorites/${recipeId}`, {
+    const response = await fetch(`${API_BASE_URL}/api/favorites/${recipeId}`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -70,7 +70,7 @@ export const favoritesService = {
    */
   removeFromFavorites: async (recipeId: number, token: string): Promise<void> => {
     if (!token) throw new Error('Authentication token is required to remove favorites.');
-    const response = await fetch(`${API_BASE_URL}/favorites/${recipeId}`, {
+    const response = await fetch(`${API_BASE_URL}/api/favorites/${recipeId}`, {
       method: 'DELETE',
       headers: {
         'Authorization': `Bearer ${token}`,
