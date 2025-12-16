@@ -58,10 +58,24 @@ const BadgeList = () => {
     const fetchAllBadgeMetadata = async () => {
       setAllBadgesLoading(true);
       try {
-        const response = await fetch(`${API_BASE_URL}/badges/all`);
+        if (!API_BASE_URL) {
+          throw new Error('API_BASE_URL is not configured');
+        }
+        const response = await fetch(`${API_BASE_URL}/api/badges/all`);
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+          const text = await response.text();
+          console.error('Badges fetch failed: Server returned non-JSON response', {
+            status: response.status,
+            statusText: response.statusText,
+            contentType,
+            body: text.substring(0, 200),
+          });
+          throw new Error(`Server error: ${response.status} ${response.statusText}`);
+        }
         if (response.ok) {
           const data = await response.json();
-          setAllBadgeMetadata(data.badges);
+          setAllBadgeMetadata(data.badges || []);
         } else {
           console.error('Failed to fetch all badge metadata:', response.statusText);
           toast({
@@ -70,11 +84,11 @@ const BadgeList = () => {
             variant: 'destructive',
           });
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Network error fetching all badge metadata:', error);
         toast({
           title: 'Сетевая ошибка',
-          description: 'Нет связи со службой значков.',
+          description: error.message || 'Нет связи со службой значков.',
           variant: 'destructive',
         });
       } finally {
@@ -96,20 +110,36 @@ const BadgeList = () => {
 
       setUserBadgesLoading(true);
       try {
-        const response = await fetch(`${API_BASE_URL}/badges/user`, {
+        if (!API_BASE_URL) {
+          throw new Error('API_BASE_URL is not configured');
+        }
+        const response = await fetch(`${API_BASE_URL}/api/badges/user`, {
           headers: {
             'Authorization': `Bearer ${user.token}`,
           },
         });
 
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+          const text = await response.text();
+          console.error('User badges fetch failed: Server returned non-JSON response', {
+            status: response.status,
+            statusText: response.statusText,
+            contentType,
+            body: text.substring(0, 200),
+          });
+          setUserEarnedBadges([]);
+          return;
+        }
+
         if (response.ok) {
           const data = await response.json();
-          setUserEarnedBadges(data.badges);
+          setUserEarnedBadges(data.badges || []);
         } else {
           console.error('Failed to fetch user-earned badges:', response.statusText);
           setUserEarnedBadges([]);
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Network error fetching user-earned badges:', error);
         setUserEarnedBadges([]);
       } finally {

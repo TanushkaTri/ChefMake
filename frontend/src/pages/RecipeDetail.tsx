@@ -53,11 +53,40 @@ const RecipeDetail = () => {
       setError(null);
 
       try {
-        const response = await fetch(`${API_BASE_URL}/recipes/${id}`, {
+        if (!API_BASE_URL) {
+          setError("API_BASE_URL is not configured");
+          toast({
+            title: "Ошибка конфигурации",
+            description: "API_BASE_URL не настроен",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        const response = await fetch(`${API_BASE_URL}/api/recipes/${id}`, {
             headers: {
                 'Authorization': `Bearer ${user.token}`,
             },
         });
+
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+          const text = await response.text();
+          console.error("Recipe fetch failed: Server returned non-JSON response", {
+            status: response.status,
+            statusText: response.statusText,
+            contentType,
+            body: text.substring(0, 200),
+          });
+          setError(`Ошибка сервера: ${response.status} ${response.statusText}`);
+          toast({
+            title: "Ошибка сервера",
+            description: `Сервер вернул не-JSON ответ: ${response.status}`,
+            variant: "destructive",
+          });
+          return;
+        }
+
         const data = await response.json();
 
         if (response.ok) {
