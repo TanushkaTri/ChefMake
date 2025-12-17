@@ -67,6 +67,18 @@ exports.ensureCallMember = async ({ template = "default", callId, userId, role =
   const client = ensureConfigured();
   const call = client.video.call(template, callId);
   await ensureCallExists({ template, callId, startsAt });
+  // Гарантируем, что пользователь существует в Stream перед добавлением в участники звонка
+  try {
+    await client.upsertUsers([
+      {
+        id: userId,
+      },
+    ]);
+  } catch (err) {
+    console.error("[STREAM][UPSERT USER] Failed:", err);
+    // Не прерываем выполнение, попробуем всё равно добавить в звонок,
+    // так как пользователь мог быть создан ранее.
+  }
   await call.updateCallMembers({
     update_members: [
       {
