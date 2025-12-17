@@ -13,7 +13,7 @@ const Sidebar = () => {
     { icon: <Heart className="h-5 w-5" />, label: "Избранное", path: "/favorites" },
     // { icon: <Trophy className="h-5 w-5" />, label: "Достижения", path: "/gamification" },
     { icon: <Calendar className="h-5 w-5" />, label: "План питания", path: "/meal-planner" },
-    { icon: <MessageCircle className="h-5 w-5" />, label: "Чат ChiefMate", path: "/chiefmate" },
+    { icon: <MessageCircle className="h-5 w-5" />, label: "Чат ChefMake", path: "/chiefmate" },
     { icon: <GraduationCap className="h-5 w-5" />, label: "Мастер-классы", path: "/master-classes" },
   ];
 

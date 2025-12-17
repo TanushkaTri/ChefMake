@@ -43,7 +43,7 @@ const ChiefMateChat = () => {
 
     const handleSendMessage = async () => {
         if (!newMessage.trim() || !user?.token) {
-            toast({ title: "Нужна авторизация", description: "Войдите, чтобы общаться с ChiefMate.", variant: "destructive" });
+            toast({ title: "Нужна авторизация", description: "Войдите, чтобы общаться с ChefMake.", variant: "destructive" });
             return;
         }
 
@@ -77,7 +77,7 @@ const ChiefMateChat = () => {
             console.error("Error sending message to AI:", error);
             toast({
                 title: "Ошибка чата",
-                description: `Не удалось получить ответ ChiefMate: ${error.message}. Попробуйте ещё раз.`,
+                description: `Не удалось получить ответ ChefMake: ${error.message}. Попробуйте ещё раз.`,
                 variant: "destructive",
             });
             setMessages(prev => prev.filter(msg => msg.id !== userDisplayMessage.id)); 
@@ -105,7 +105,7 @@ const ChiefMateChat = () => {
                 <CardHeader className="pb-4 flex-shrink-0">
                     <CardTitle className="flex items-center space-x-2 text-white">
                         <ChefHat className="h-5 w-5 text-orange-500" />
-                        <span>Ассистент ChiefMate</span>
+                        <span>Ассистент ChefMake</span>
                         <div className="ml-auto flex items-center space-x-2">
                             <div className="w-2 h-2 bg-green-500 rounded-full "></div>
                             <span className="text-sm text-green-400">Онлайн</span>
