@@ -67,12 +67,18 @@ exports.ensureCallMember = async ({ template = "default", callId, userId, role =
   const client = ensureConfigured();
   const call = client.video.call(template, callId);
   await ensureCallExists({ template, callId, startsAt });
+
+  // В Stream Video используются собственные роли с политиками доступа.
+  // Чтобы не упираться в ограничения нестандартных ролей ("host"/"guest"),
+  // всегда подключаем пользователя как обычного участника звонка.
+  const streamRole = "user";
+
   // Гарантируем, что пользователь существует в Stream перед добавлением в участники звонка
   try {
     await client.upsertUsers([
       {
         id: userId,
-        role,
+        role: streamRole,
       },
     ]);
   } catch (err) {
@@ -85,7 +91,7 @@ exports.ensureCallMember = async ({ template = "default", callId, userId, role =
       update_members: [
         {
           user_id: userId,
-          role,
+          role: streamRole,
         },
       ],
     });
