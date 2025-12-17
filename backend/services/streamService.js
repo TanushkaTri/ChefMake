@@ -69,23 +69,35 @@ exports.ensureCallMember = async ({ template = "default", callId, userId, role =
   await ensureCallExists({ template, callId, startsAt });
   // Гарантируем, что пользователь существует в Stream перед добавлением в участники звонка
   try {
-    await client.upsertUsers({
-      [userId]: {
+    await client.upsertUsers([
+      {
         id: userId,
+        role,
       },
-    });
+    ]);
   } catch (err) {
     console.error("[STREAM][UPSERT USER] Failed:", err);
     // Не прерываем выполнение, попробуем всё равно добавить в звонок,
     // так как пользователь мог быть создан ранее.
   }
-  await call.updateCallMembers({
-    update_members: [
-      {
-        user_id: userId,
-        role,
-      },
-    ],
-  });
+  try {
+    await call.updateCallMembers({
+      update_members: [
+        {
+          user_id: userId,
+          role,
+        },
+      ],
+    });
+  } catch (err) {
+    console.error("[STREAM][UPDATE CALL MEMBERS] Failed:", err);
+    const msg = err?.message || "";
+    const code = err?.metadata?.responseCode;
+    // Если Stream по-прежнему считает, что пользователь не существует,
+    // не роняем весь запрос токена, чтобы не блокировать подключение.
+    if (!(code === 400 && msg.includes("don't exist"))) {
+      throw err;
+    }
+  }
 };
 
