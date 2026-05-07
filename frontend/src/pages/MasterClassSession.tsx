@@ -154,7 +154,9 @@ const MasterClassSession = () => {
       return masterClassService.getMessages(Number(id), user.token);
     },
     enabled: canFetchMessages,
-    refetchInterval: 5000,
+    staleTime: 10_000,
+    refetchOnWindowFocus: false,
+    refetchInterval: () => (document.visibilityState === "visible" ? 5000 : false),
   });
 
   const sendMessage = useMutation({

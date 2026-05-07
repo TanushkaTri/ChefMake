@@ -82,6 +82,14 @@ exports.create = async (req, res) => {
     const streamCallId =
       videoMode === "stream" ? `masterclass_${crypto.randomUUID()}` : null;
 
+    if (!Number.isFinite(startDate.getTime())) {
+      return res.status(400).json({ message: "Некорректная дата startTime" });
+    }
+
+    if (startDate.getTime() < Date.now()) {
+      return res.status(400).json({ message: "Нельзя назначить мастер-класс раньше текущего времени" });
+    }
+
     if (videoMode === "stream") {
       await createVideoCall({
         template: STREAM_TEMPLATE,

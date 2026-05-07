@@ -24,20 +24,32 @@ const ResetPassword = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { loginWithSupabaseToken, user } = useAuth();
+  const { loginWithSupabaseToken, resetPassword: resetPasswordWithToken, user } = useAuth();
 
-  const [accessToken, setAccessToken] = useState<string | null>(null);
-  const [refreshToken, setRefreshToken] = useState<string | null>(null);
   const [stage, setStage] = useState<"init" | "ready" | "success" | "error">("init");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [mode, setMode] = useState<"supabase" | "token">("supabase");
+  const [resetToken, setResetToken] = useState<string | null>(null);
 
   const hashParams = useMemo(() => parseHashParams(location.hash), [location.hash]);
+  const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
 
   useEffect(() => {
     const bootstrap = async () => {
+      const queryToken = searchParams.get("token");
+      const queryCode = searchParams.get("code");
+
+      // If we received a local reset token, use backend reset flow (no session required)
+      if (queryToken) {
+        setMode("token");
+        setResetToken(queryToken);
+        setStage("ready");
+        return;
+      }
+
       // Проверяем наличие ошибки в URL
       if (hashParams.error) {
         const errorDesc = hashParams.error_description 
@@ -49,9 +61,15 @@ const ResetPassword = () => {
         return;
       }
 
-      if (hashParams.type !== "recovery" || !hashParams.access_token || !hashParams.refresh_token) {
-        // Если пользователь уже авторизован, разрешаем ручной сброс
+      // Supabase recovery links can be either:
+      // - hash: #access_token=...&refresh_token=...&type=recovery
+      // - query: ?code=... (PKCE), must be exchanged for session
+      const hasHashRecovery = hashParams.type === "recovery" && !!hashParams.access_token && !!hashParams.refresh_token;
+      const hasCodeRecovery = !!queryCode;
+      if (!hasHashRecovery && !hasCodeRecovery) {
+        // Если пользователь уже авторизован, разрешаем ручной сброс через change-password
         if (user?.token) {
+          setMode("supabase");
           setStage("ready");
         } else {
           setErrorMessage("Ссылка для сброса пароля не найдена. Запросите новую ссылку.");
@@ -59,19 +77,40 @@ const ResetPassword = () => {
         }
         return;
       }
+
       try {
         setLoading(true);
-        await supabase.auth.setSession({
-          access_token: hashParams.access_token,
-          refresh_token: hashParams.refresh_token,
-        });
-        setAccessToken(hashParams.access_token);
-        setRefreshToken(hashParams.refresh_token);
-        const ok = await loginWithSupabaseToken(hashParams.access_token);
+
+        let accessTokenToExchange: string | null = null;
+        if (hasCodeRecovery && queryCode) {
+          const { data, error } = await supabase.auth.exchangeCodeForSession(queryCode);
+          if (error) {
+            throw new Error(error.message);
+          }
+          accessTokenToExchange = data.session?.access_token || null;
+        } else if (hasHashRecovery && hashParams.access_token && hashParams.refresh_token) {
+          const { error } = await supabase.auth.setSession({
+            access_token: hashParams.access_token,
+            refresh_token: hashParams.refresh_token,
+          });
+          if (error) {
+            throw new Error(error.message);
+          }
+          accessTokenToExchange = hashParams.access_token;
+        }
+
+        if (!accessTokenToExchange) {
+          setErrorMessage("Не удалось подтвердить ссылку. Запросите новую ссылку для сброса пароля.");
+          setStage("error");
+          return;
+        }
+
+        const ok = await loginWithSupabaseToken(accessTokenToExchange);
         if (!ok) {
           setErrorMessage("Не удалось подтвердить ссылку. Запросите новую ссылку для сброса пароля.");
           setStage("error");
         } else {
+          setMode("supabase");
           setStage("ready");
         }
       } catch (err) {
@@ -83,7 +122,7 @@ const ResetPassword = () => {
       }
     };
     bootstrap();
-  }, [hashParams, loginWithSupabaseToken, user]);
+  }, [hashParams, loginWithSupabaseToken, searchParams, user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,45 +134,59 @@ const ResetPassword = () => {
       });
       return;
     }
-    if (!user?.token) {
-      toast({
-        title: "Нет активной сессии",
-        description: "Перейдите по ссылке из письма ещё раз.",
-        variant: "destructive",
-      });
-      return;
-    }
+
     try {
       setLoading(true);
-      const apiUrl = import.meta.env.VITE_API_BASE_URL;
-      if (!apiUrl) {
-        throw new Error("API_BASE_URL is not configured");
-      }
-      const response = await fetch(`${apiUrl}/api/auth/change-password`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${user.token}`,
-        },
-        body: JSON.stringify({ newPassword: password }),
-      });
-      
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        const text = await response.text();
-        console.error("Change password failed: Server returned non-JSON response", {
-          status: response.status,
-          statusText: response.statusText,
-          contentType,
-          body: text.substring(0, 200),
+
+      if (mode === "token") {
+        if (!resetToken) {
+          throw new Error("Ссылка для сброса пароля не содержит токен. Запросите новую ссылку.");
+        }
+        const result = await resetPasswordWithToken(resetToken, password);
+        if (!result.success) {
+          throw new Error(result.message || "Не удалось сменить пароль");
+        }
+      } else {
+        if (!user?.token) {
+          toast({
+            title: "Нет активной сессии",
+            description: "Перейдите по ссылке из письма ещё раз.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        const apiUrl = import.meta.env.VITE_API_BASE_URL;
+        if (!apiUrl) {
+          throw new Error("API_BASE_URL is not configured");
+        }
+        const response = await fetch(`${apiUrl}/api/auth/change-password`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${user.token}`,
+          },
+          body: JSON.stringify({ newPassword: password }),
         });
-        throw new Error(`Server error: ${response.status} ${response.statusText}`);
+
+        const contentType = response.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+          const text = await response.text();
+          console.error("Change password failed: Server returned non-JSON response", {
+            status: response.status,
+            statusText: response.statusText,
+            contentType,
+            body: text.substring(0, 200),
+          });
+          throw new Error(`Server error: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.message || "Не удалось сменить пароль");
+        }
       }
-      
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.message || "Не удалось сменить пароль");
-      }
+
       setStage("success");
       toast({
         title: "Пароль обновлён",
@@ -246,7 +299,7 @@ const ResetPassword = () => {
             </div>
           )}
 
-          {stage !== "success" && stage !== "error" && !accessToken && (
+          {stage !== "success" && stage !== "error" && stage !== "init" && (
             <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
               <AlertCircle className="h-4 w-4 text-amber-500" />
               Если ссылка устарела, запросите сброс пароля ещё раз.

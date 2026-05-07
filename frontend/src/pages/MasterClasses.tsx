@@ -63,6 +63,17 @@ const defaultForm = {
   conferenceUrl: "",
 };
 
+const toDatetimeLocalMin = (date: Date) => {
+  // Format to "YYYY-MM-DDTHH:mm" in local time for input[type=datetime-local]
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const y = date.getFullYear();
+  const m = pad(date.getMonth() + 1);
+  const d = pad(date.getDate());
+  const hh = pad(date.getHours());
+  const mm = pad(date.getMinutes());
+  return `${y}-${m}-${d}T${hh}:${mm}`;
+};
+
 const MasterClasses = () => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -91,6 +102,11 @@ const MasterClasses = () => {
   const createMutation = useMutation({
     mutationFn: () => {
       if (!token) throw new Error("Нет токена");
+      if (!formValues.startTime) throw new Error("Укажите дату и время");
+      const start = new Date(formValues.startTime);
+      if (!Number.isFinite(start.getTime())) throw new Error("Некорректная дата");
+      if (start.getTime() < Date.now()) throw new Error("Нельзя выбрать дату раньше текущего времени");
+
       const ingredients = formValues.ingredientsInput
         .split("\n")
         .map((line) => line.trim())
@@ -100,7 +116,7 @@ const MasterClasses = () => {
         {
           title: formValues.title,
           description: formValues.description,
-          startTime: new Date(formValues.startTime).toISOString(),
+          startTime: start.toISOString(),
           durationMinutes: formValues.durationMinutes,
           ingredients,
           videoMode: formValues.videoMode,
@@ -205,6 +221,7 @@ const MasterClasses = () => {
     formValues.title.trim().length > 3 &&
     formValues.startTime &&
     (formValues.videoMode === "stream" || formValues.conferenceUrl.trim().length > 5);
+  const startTimeMin = useMemo(() => toDatetimeLocalMin(new Date()), []);
 
   return (
     <div className="space-y-8">
@@ -247,6 +264,7 @@ const MasterClasses = () => {
                     type="datetime-local"
                     value={formValues.startTime}
                     onChange={(e) => setFormValues((prev) => ({ ...prev, startTime: e.target.value }))}
+                    min={startTimeMin}
                   />
                 </div>
               </div>

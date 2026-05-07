@@ -267,13 +267,13 @@ exports.handleChat = async (req, res) => {
 };
 
 const buildLocalShoppingList = async (dishNames, userId) => {
-    // Fetch ingredients from local DB by dish names
+    // Backward-compatible local list builder (no quantity aggregation).
+    // Prefer using buildAggregatedShoppingListFromRecipes when recipeIds are available.
     const dbResult = await pool.query(
         `SELECT name, ingredients FROM recipes WHERE name = ANY($1::text[])`,
         [dishNames]
     );
 
-    // Build a simple deduplicated shopping list
     const ingredientSet = new Set();
     for (const row of dbResult.rows) {
         const parts = (row.ingredients || '')
@@ -283,7 +283,6 @@ const buildLocalShoppingList = async (dishNames, userId) => {
         parts.forEach(p => ingredientSet.add(p));
     }
 
-    // Fallback if recipes not found: just list dish names
     const lines = ingredientSet.size > 0
         ? Array.from(ingredientSet).map((ing, idx) => `${idx + 1}. ${ing}`)
         : dishNames.map((d, idx) => `${idx + 1}. Ингредиенты для ${d}`);
@@ -292,6 +291,174 @@ const buildLocalShoppingList = async (dishNames, userId) => {
     const listToSave = { content: generatedList, dishes: dishNames };
     const savedList = await ShoppingListModel.saveShoppingList(userId, listToSave);
     return { generatedList, savedList };
+};
+
+const normalizeUnit = (rawUnit) => {
+    const u = (rawUnit || "").toLowerCase().replace(/\./g, "").trim();
+    if (!u) return null;
+    if (u === "г" || u === "гр" || u === "грамм" || u === "грамма" || u === "граммов") return "g";
+    if (u === "кг" || u === "килограмм" || u === "килограмма" || u === "килограммов") return "kg";
+    if (u === "мл" || u === "миллилитр" || u === "миллилитра" || u === "миллилитров") return "ml";
+    if (u === "л" || u === "литр" || u === "литра" || u === "литров") return "l";
+    if (u === "шт" || u === "ш" || u === "штука" || u === "штуки" || u === "штук") return "pcs";
+    if (u === "пачка" || u === "пач" || u === "пачки" || u === "пачек") return "pack";
+    if (u === "уп" || u === "упак" || u === "упаковка" || u === "упаковки" || u === "упаковок") return "pack";
+    return u;
+};
+
+const UNIT_LABEL_RU = {
+    g: "г",
+    kg: "кг",
+    ml: "мл",
+    l: "л",
+    pcs: "шт",
+    pack: "пач.",
+};
+
+const parseIngredientToken = (token) => {
+    // Examples supported:
+    // "200 г муки", "1.5 кг картофеля", "2 шт яйца", "1 пачка творога"
+    // If no quantity detected -> quantity null, unit null, name = token
+    const original = (token || "").trim();
+    if (!original) return null;
+
+    const cleaned = original
+        .replace(/\s+/g, " ")
+        .replace(/^\-+\s*/, "")
+        .replace(/^•\s*/, "")
+        .trim();
+
+    // Capture quantity + unit at the beginning
+    const m = cleaned.match(/^(\d+(?:[.,]\d+)?)\s*([A-Za-zА-Яа-яЁё.]+)\s+(.+)$/);
+    if (m) {
+        const qty = parseFloat(m[1].replace(",", "."));
+        const unit = normalizeUnit(m[2]);
+        const name = (m[3] || "").trim();
+        return { qty: Number.isFinite(qty) ? qty : null, unit: unit || null, name: name || cleaned };
+    }
+
+    // Quantity without unit e.g. "2 яйца"
+    const m2 = cleaned.match(/^(\d+(?:[.,]\d+)?)\s+(.+)$/);
+    if (m2) {
+        const qty = parseFloat(m2[1].replace(",", "."));
+        const name = (m2[2] || "").trim();
+        return { qty: Number.isFinite(qty) ? qty : null, unit: null, name: name || cleaned };
+    }
+
+    return { qty: null, unit: null, name: cleaned };
+};
+
+const normalizeIngredientName = (name) => {
+    return (name || "")
+        .toLowerCase()
+        .replace(/[()]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+};
+
+const aggregateItems = (items) => {
+    // items: {name, qty, unit}
+    const map = new Map();
+    for (const it of items) {
+        if (!it || !it.name) continue;
+        const normName = normalizeIngredientName(it.name);
+        const unit = it.unit || "pcs"; // default to pcs if omitted
+        const key = `${normName}::${unit}`;
+        const prev = map.get(key) || { name: it.name.trim(), qty: 0, unit };
+        const addQty = typeof it.qty === "number" && Number.isFinite(it.qty) ? it.qty : 1;
+        prev.qty += addQty;
+        map.set(key, prev);
+    }
+    return Array.from(map.values());
+};
+
+const convertAndFormat = (items) => {
+    // Convert g->kg when >=1000, ml->l when >=1000
+    const converted = items.map((it) => {
+        if (it.unit === "g" && it.qty >= 1000) {
+            return { ...it, qty: it.qty / 1000, unit: "kg" };
+        }
+        if (it.unit === "ml" && it.qty >= 1000) {
+            return { ...it, qty: it.qty / 1000, unit: "l" };
+        }
+        return it;
+    });
+
+    const byUnitOrder = (u) => {
+        if (u === "kg" || u === "g") return 1;
+        if (u === "l" || u === "ml") return 2;
+        if (u === "pack") return 3;
+        if (u === "pcs") return 4;
+        return 5;
+    };
+
+    converted.sort((a, b) => {
+        const au = byUnitOrder(a.unit);
+        const bu = byUnitOrder(b.unit);
+        if (au !== bu) return au - bu;
+        return a.name.localeCompare(b.name, "ru");
+    });
+
+    const formatQty = (qty) => {
+        if (!Number.isFinite(qty)) return "";
+        // keep 1 decimal max for converted values
+        const rounded = Math.round(qty * 10) / 10;
+        return String(rounded).replace(".", ",");
+    };
+
+    return converted.map((it) => {
+        const unitLabel = UNIT_LABEL_RU[it.unit] || it.unit;
+        return `- ${it.name} — ${formatQty(it.qty)} ${unitLabel}`.trim();
+    });
+};
+
+const buildAggregatedShoppingListFromRecipes = async ({ recipeIds, userId }) => {
+    const ids = (recipeIds || []).map((x) => Number(x)).filter((x) => Number.isInteger(x));
+    if (!ids.length) {
+        throw new Error("recipeIds must be a non-empty array of integers");
+    }
+
+    const dbResult = await pool.query(
+        `SELECT id, name, ingredients FROM recipes WHERE id = ANY($1::int[])`,
+        [ids]
+    );
+
+    const rawItems = [];
+    for (const row of dbResult.rows) {
+        const raw = (row.ingredients || "").toString();
+        const parts = raw
+            .split(/,|\n|\r\n/g)
+            .map((s) => s.trim())
+            .filter(Boolean);
+
+        for (const part of parts) {
+            const parsed = parseIngredientToken(part);
+            if (!parsed) continue;
+            rawItems.push({
+                name: parsed.name,
+                qty: parsed.qty,
+                unit: parsed.unit,
+            });
+        }
+    }
+
+    const aggregated = aggregateItems(rawItems);
+    const lines = convertAndFormat(aggregated);
+
+    const recipeNames = dbResult.rows.map((r) => r.name).filter(Boolean);
+    const generatedList = [
+        "Список покупок",
+        "",
+        ...lines,
+        "",
+        recipeNames.length ? `Блюда: ${recipeNames.join(", ")}` : "",
+    ]
+        .filter((x) => x !== "")
+        .join("\n");
+
+    const listToSave = { content: generatedList, dishes: recipeNames };
+    const savedList = await ShoppingListModel.saveShoppingList(userId, listToSave);
+    return { generatedList, savedList, recipeNames };
 };
 
 const isMostlyCyrillic = (text) => {
@@ -303,15 +470,21 @@ const isMostlyCyrillic = (text) => {
 };
 
 exports.generateShoppingList = async (req, res) => {
-    const { dishNames } = req.body;
+    const { dishNames, recipeIds } = req.body;
     const userId = req.user.id;
 
     if (!userId) return res.status(401).json({ error: 'Authentication required.' });
-    if (!Array.isArray(dishNames) || dishNames.length === 0) {
-        return res.status(400).json({ error: 'Please provide an array of dish names.' });
+    const hasRecipeIds = Array.isArray(recipeIds) && recipeIds.length > 0;
+    const hasDishNames = Array.isArray(dishNames) && dishNames.length > 0;
+    if (!hasRecipeIds && !hasDishNames) {
+        return res.status(400).json({ error: 'Please provide dishNames or recipeIds.' });
     }
-    // Sort dish names to ensure consistent cache keys 
-    const specificCacheKey = `shopping_list:${userId}:${JSON.stringify(dishNames.sort())}`;
+
+    const cacheSignature = hasRecipeIds
+        ? JSON.stringify([...new Set(recipeIds.map((x) => Number(x)).filter((x) => Number.isInteger(x)))].sort((a, b) => a - b))
+        : JSON.stringify(dishNames.slice().sort());
+
+    const specificCacheKey = `shopping_list:${userId}:${cacheSignature}`;
     const latestListCacheKey = `latest_shopping_list:${userId}`;
 
     // Check if the specific list is already in the cache
@@ -325,6 +498,26 @@ exports.generateShoppingList = async (req, res) => {
     if (cachedResult) {
         console.log('Serving shopping list from Redis cache.');
         return res.status(200).json(JSON.parse(cachedResult));
+    }
+
+    // If recipeIds are provided (meal plan scenario), always generate locally with quantity/unit aggregation.
+    if (hasRecipeIds) {
+        try {
+            const { generatedList, savedList, recipeNames } = await buildAggregatedShoppingListFromRecipes({ recipeIds, userId });
+            const responseData = { shoppingList: generatedList, savedListId: savedList.id, dishes: recipeNames };
+
+            await safeSetCache(specificCacheKey, JSON.stringify(responseData), 3600);
+            await safeSetCache(
+                latestListCacheKey,
+                JSON.stringify({ shoppingList: savedList.items, generatedAt: savedList.generated_at.toISOString() }),
+                3600
+            );
+
+            return res.status(200).json(responseData);
+        } catch (error) {
+            console.error("Aggregated shopping list failed:", error);
+            return res.status(500).json({ error: "Failed to generate shopping list from recipes.", details: error.message });
+        }
     }
 
     const russianShoppingInstruction = "Ты помощник-повар. Пиши ТОЛЬКО на русском, без английских слов. Составь краткий список покупок, сгруппированный по категориям (овощи, молочное, крупы, специи и т.д.). Формат: подзаголовок категории и пункты ниже. Без пояснений, только список.";

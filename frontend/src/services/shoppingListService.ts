@@ -28,15 +28,16 @@ export const shoppingListService = {
    */
   async generateList(
     dishNames: string[],
-    token: string
-  ): Promise<ShoppingListResponse> {
+    token: string,
+    recipeIds?: number[]
+  ): Promise<ShoppingListResponse & { dishes?: string[] }> {
     const response = await fetch(`${API_BASE_URL}/api/ai/generate-shopping-list`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
       },
-      body: JSON.stringify({ dishNames }),
+      body: JSON.stringify({ dishNames, recipeIds }),
     });
 
     if (!response.ok) {

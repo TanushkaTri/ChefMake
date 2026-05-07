@@ -68,8 +68,12 @@ const PORT = process.env.PORT || 5000;
 (async () => {
     try {
         // Supabase PostgreSQL connection
-        await pool.connect();
-        await pool.connect();
+        const client = await pool.connect();
+        try {
+            await client.query("SELECT 1;");
+        } finally {
+            client.release();
+        }
         console.log("Connected to Supabase PostgreSQL");
 
         // Connect to Redis

@@ -329,18 +329,23 @@ const MealPlanner = () => {
             return;
         }
 
-        const meals = Object.values(mealPlan)
-            .flatMap(day => Object.values(day).filter(Boolean))
-            .map(meal => (meal as { name: string }).name); 
+        const plannedMeals = Object.values(mealPlan).flatMap(day => Object.values(day).filter(Boolean));
+        const recipeIds = plannedMeals
+            .map(meal => (meal as { recipeId: number }).recipeId)
+            .filter((id): id is number => typeof id === 'number' && Number.isFinite(id));
+
+        const meals = plannedMeals.map(meal => (meal as { name: string }).name);
         
-        if (meals.length === 0) {
+        if (meals.length === 0 || recipeIds.length === 0) {
             toast({ title: "Нет блюд в плане", description: "Добавьте рецепты, прежде чем формировать список.", variant: "info" });
             return;
         }
 
         setIsGeneratingList(true);
         try {
-            const response = await shoppingListService.generateList(meals, user.token);
+            // Prefer recipeIds: this enables aggregation by грамм/кг/шт/пачки on the backend.
+            const uniqueRecipeIds = Array.from(new Set(recipeIds));
+            const response = await shoppingListService.generateList(meals, user.token, uniqueRecipeIds);
             
             // Automatically download the shopping list as DOCX file
             if (response.shoppingList) {

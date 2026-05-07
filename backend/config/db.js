@@ -19,8 +19,8 @@ const pool = new Pool({
       }
     : {
         // Fallback to allow connection if CA file is missing
-        rejectUnauthorized: false,
-      },
+    rejectUnauthorized: false, 
+  },
 });
 
 module.exports = pool;
