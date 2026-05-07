@@ -328,7 +328,7 @@ const parseIngredientToken = (token) => {
         .replace(/^•\s*/, "")
         .trim();
 
-    // Capture quantity + unit at the beginning
+    // 1) Format: "200 г муки" / "1.5 кг картофеля" / "2 шт яйца"
     const m = cleaned.match(/^(\d+(?:[.,]\d+)?)\s*([A-Za-zА-Яа-яЁё.]+)\s+(.+)$/);
     if (m) {
         const qty = parseFloat(m[1].replace(",", "."));
@@ -337,7 +337,16 @@ const parseIngredientToken = (token) => {
         return { qty: Number.isFinite(qty) ? qty : null, unit: unit || null, name: name || cleaned };
     }
 
-    // Quantity without unit e.g. "2 яйца"
+    // 2) Format: "мука 200 г" / "баранина 400гр" / "вода 2000мл"
+    const mEnd = cleaned.match(/^(.+?)\s*(\d+(?:[.,]\d+)?)\s*([A-Za-zА-Яа-яЁё.]+)\s*$/);
+    if (mEnd) {
+        const name = (mEnd[1] || "").trim();
+        const qty = parseFloat(mEnd[2].replace(",", "."));
+        const unit = normalizeUnit(mEnd[3]);
+        return { qty: Number.isFinite(qty) ? qty : null, unit: unit || null, name: name || cleaned };
+    }
+
+    // Quantity without unit (fallback): keep qty but no unit (we won't render as "шт")
     const m2 = cleaned.match(/^(\d+(?:[.,]\d+)?)\s+(.+)$/);
     if (m2) {
         const qty = parseFloat(m2[1].replace(",", "."));
@@ -362,11 +371,22 @@ const aggregateItems = (items) => {
     for (const it of items) {
         if (!it || !it.name) continue;
         const normName = normalizeIngredientName(it.name);
-        const unit = it.unit || "pcs"; // default to pcs if omitted
-        const key = `${normName}::${unit}`;
-        const prev = map.get(key) || { name: it.name.trim(), qty: 0, unit };
-        const addQty = typeof it.qty === "number" && Number.isFinite(it.qty) ? it.qty : 1;
-        prev.qty += addQty;
+        const unitKey = it.unit || "unknown";
+        const key = `${normName}::${unitKey}`;
+
+        const prev = map.get(key) || {
+            name: it.name.trim(),
+            qty: typeof it.qty === "number" && Number.isFinite(it.qty) ? it.qty : null,
+            unit: it.unit || null,
+        };
+
+        if (prev.qty !== null && typeof it.qty === "number" && Number.isFinite(it.qty)) {
+            prev.qty += it.qty;
+        } else if (prev.qty === null && typeof it.qty === "number" && Number.isFinite(it.qty)) {
+            prev.qty = it.qty;
+            prev.unit = it.unit || null;
+        }
+
         map.set(key, prev);
     }
     return Array.from(map.values());
@@ -389,7 +409,7 @@ const convertAndFormat = (items) => {
         if (u === "l" || u === "ml") return 2;
         if (u === "pack") return 3;
         if (u === "pcs") return 4;
-        return 5;
+        return 10;
     };
 
     converted.sort((a, b) => {
@@ -407,6 +427,14 @@ const convertAndFormat = (items) => {
     };
 
     return converted.map((it) => {
+        if (it.qty === null || it.qty === undefined || !Number.isFinite(it.qty)) {
+            return `- ${it.name}`.trim();
+        }
+
+        if (!it.unit) {
+            return `- ${it.name} — ${formatQty(it.qty)}`.trim();
+        }
+
         const unitLabel = UNIT_LABEL_RU[it.unit] || it.unit;
         return `- ${it.name} — ${formatQty(it.qty)} ${unitLabel}`.trim();
     });
